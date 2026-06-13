@@ -81,7 +81,7 @@ All input data are available in the external UCLouvain SharePoint folder:
 
 [UCLouvain SharePoint data folder](https://uclouvain-my.sharepoint.com/:f:/r/personal/laura_damien_student_uclouvain_be/Documents/LGEO2185_NAO_Iberian_Hydroclimate_Extremes_LauraDamien?csf=1&web=1&e=EVHYwZ)
 
-Users must download the ERA5 NetCDF files and the `NAO_index.csv` file and place them in the `data/` folder before rendering the Quarto report.
+Users must download the ERA5 NetCDF files and the `NAO_index.csv` file and place them in the `data/` folder before rendering `NAO_Iberian_Peninsula.qmd`.
 
 ## Data sensitivity
 
