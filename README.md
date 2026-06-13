@@ -11,9 +11,9 @@ Institution: UCLouvain – School of Geography
 
 This repository contains the code, documentation, and project files for a geospatial analysis of the influence of the North Atlantic Oscillation (NAO) on hydroclimatic extremes in the Iberian Peninsula.
 
-The project uses ERA5 precipitation data and a seasonal NAO index to analyse extreme precipitation and drought patterns between 1995 and 2025. Extreme precipitation is identified using the 95th percentile of wet days, while drought is analysed using the Standardized Precipitation Index at a three-month timescale, SPI-3.
+The project uses ERA5 precipitation data and a seasonal NAO index to analyse extreme precipitation and drought patterns between 1995 and 2025. Extreme precipitation is identified using the 95th percentile of wet days and drought is analysed using the Standardized Precipitation Index, SPI-3.
 
-The full input data are not stored directly in this GitHub repository because the ERA5 NetCDF files are too large. Instead, the data are available through an external UCLouvain SharePoint folder.
+The input data are not stored in this GitHub repository because the ERA5 NetCDF files are too large. Instead, the data are available in an external UCLouvain SharePoint folder.
 
 External data folder:
 [UCLouvain SharePoint data folder](https://uclouvain-my.sharepoint.com/:f:/r/personal/laura_damien_student_uclouvain_be/Documents/LGEO2185_NAO_Iberian_Hydroclimate_Extremes_LauraDamien?csf=1&web=1&e=EVHYwZ)
@@ -24,11 +24,11 @@ The objective of this project is to assess whether different NAO phases are asso
 
 The study focuses on:
 
-* identifying extreme precipitation events using local wet-day percentile thresholds;
+* identifying extreme precipitation events;
 * analysing the seasonal and spatial variability of extreme precipitation;
-* identifying drought conditions using SPI-3;
+* identifying drought conditions;
 * comparing extreme precipitation and drought patterns between positive, negative, and neutral NAO phases;
-* assessing these relationships using Welch t-tests and Pearson correlations.
+* assessing these relationships with Welch t-tests and Pearson correlations.
 
 ## Repository structure
 
@@ -47,10 +47,10 @@ NAO-Iberian-extremes/
 Main Quarto file containing the full analysis, R code, figures, interpretation, discussion, and conclusion.
 
 `metadata.md`
-Metadata file describing the input datasets, data sources, study period, study area, expected data structure, and data availability.
+Metadata file describing the input datasets, data sources, study period, study area, data structure, and data availability.
 
 `README.md`
-General project description and reproduction instructions.
+Project description and reproduction instructions.
 
 `LICENSE`
 License information for the repository.
@@ -59,7 +59,7 @@ License information for the repository.
 
 The input data are stored externally and must be downloaded before running the analysis.
 
-Expected local data structure:
+Local data structure:
 
 ```text
 data/
@@ -82,12 +82,12 @@ To reproduce the analysis:
 2. Create a local `data/` folder inside the project directory.
 3. Place all ERA5 NetCDF files and `NAO_index.csv` inside the `data/` folder.
 4. Open `NAO_Iberian_Peninsula.qmd` in RStudio.
-5. Install the required R packages if needed.
+5. Install the required R packages.
 6. Render the Quarto document.
 
-The required R packages are loaded in the Quarto file using `pacman::p_load()`.
+The R packages are loaded in the Quarto file using `pacman::p_load()`.
 
-Main R packages used:
+R packages used:
 
 * tidyverse
 * lubridate
@@ -103,20 +103,19 @@ Main R packages used:
 * grid
 * ecmwfr
 
-Package and R version information are provided in the `sessionInfo()` output at the end of the report.
 
 ## Method summary
 
-The analysis follows these main steps:
+The analysis follows these steps:
 
 1. ERA5 daily precipitation data are loaded from annual NetCDF files.
 2. Precipitation values are converted from metres to millimetres.
-3. Extreme precipitation days are identified using the local 95th percentile of wet days.
+3. Extreme precipitation days are selected with the local 95th percentile of wet days.
 4. Monthly precipitation totals are calculated.
-5. SPI-3 is computed to identify drought months.
-6. Seasonal NAO index values are classified into positive, negative, and neutral phases.
+5. SPI-3 is calculated to find drought months.
+6. Seasonal NAO index are classified in positive, negative, and neutral phases.
 7. Extreme precipitation and drought patterns are compared between NAO phases.
-8. Welch t-tests and Pearson correlations are used to assess the statistical relationships.
+8. Welch t-tests and Pearson correlations are used to see the statistical relationships.
 
 ## Data availability
 
