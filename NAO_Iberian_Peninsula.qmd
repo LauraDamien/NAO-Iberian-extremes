@@ -1160,7 +1160,7 @@ In spring, summer, and autumn, the NAO signal is less clear. The maps show more 
 
 ## Link between extreme precipitation and drought
 
-The drought results also agree with the general NAO pattern. Positive NAO is linked to more drought months in winter, especially across much of Iberia. This makes sense because positive NAO reduces winter rainfall in Southern Europe, and winter precipitation is very important for water availability in the region. Previous studies also found that positive NAO phases are connected with drought conditions in Iberia and Southern Europe. For example, the severe 2004/2005 drought in Iberia was partly linked to positive NAO conditions during the winter months (García-Herrera et al., 2007; Hertig & Pongrácz, 2013). In this study, the drought correlation map shows the same winter pattern. The strongest positive correlations are found in western and central Iberia, and many of them are statistically significant. This means that in the same season where higher NAO values reduce extreme precipitation, they are also linked to more SPI-3 drought months.
+The drought results also agree with the general NAO pattern. Positive NAO is linked to more drought months in winter, especially across much of Iberia. This makes sense because positive NAO reduces winter rainfall in Southern Europe, and winter precipitation is very important for water availability in the region. Previous studies also found that positive NAO phases are connected with drought conditions in Iberia and Southern Europe. For example, the severe 2004/2005 drought in Iberia was partly linked to positive NAO conditions during the winter months (García-Herrera et al., 2007; Santos et al., 2014). In this study, the drought correlation map shows the same winter pattern. The strongest positive correlations are found in western and central Iberia, and many of them are statistically significant. This means that in the same season where higher NAO values reduce extreme precipitation, they are also linked to more SPI-3 drought months.
 
 The results for drought show the other side of the same NAO influence. Whilst positive NAO conditions reduce winter precipitation, they can decrease the number of days with extreme precipitation and, at the same time, increase drought. This makes it important to analyse wet and dry extremes together, as both responses are linked to the same atmospheric circulation pattern.
 
@@ -1206,17 +1206,15 @@ European Environment Agency. (2024). *European Climate Risk Assessment*. EEA Rep
 
 Fuentes-Franco, R., Giorgi, F., Coppola, E., & Zimmermann, K. (2023). Winter heavy precipitation events over Northern Europe modulated by a weaker NAO variability by the end of the 21st century. *npj Climate and Atmospheric Science, 6*, 72. https://doi.org/10.1038/s41612-023-00396-1
 
-García-Herrera, R., Paredes, D., Trigo, R. M., Trigo, I. F., Hernández, E., Barriopedro, D., & Mendes, M. A. (2007). The outstanding 2004/05 drought in the Iberian Peninsula: Associated atmospheric circulation. *Journal of Hydrometeorology, 8*(3), 483--498. https://doi.org/10.1175/JHM578.1
-
-Hertig, E., & Pongrácz, R. (2013). Spring drought prediction based on winter NAO and global sea surface temperatures in the Iberian Peninsula. *Climate Dynamics, 40*, 2867--2881. https://doi.org/10.1007/s00382-012-1588-1
+García-Herrera, R., Hernández, E., Barriopedro, D., Paredes, D., Trigo, R. M., Trigo, I. F., & Mendes, M. A. (2007). The outstanding 2004/05 drought in the Iberian Peninsula: Associated atmospheric circulation. *Journal of Hydrometeorology, 8*(3), 483--498. https://doi.org/10.1175/JHM578.1
 
 Hurrell, J. W. (n.d.). *North Atlantic Oscillation (NAO) Index: PC-Based*. Climate Data Guide. National Center for Atmospheric Research. Retrieved June 1, 2026, from https://climatedataguide.ucar.edu/climate-data/hurrell-north-atlantic-oscillation-nao-index-pc-based
 
-Liu, Q., Lohmann, G., & Bothe, O. (2025). More extreme summertime North Atlantic Oscillation under climate change. *Communications Earth & Environment, 6*, 397. https://doi.org/10.1038/s43247-025-02422-x
+Liu, Q., Bader, J., Jungclaus, J. H., & Matei, D. (2025). More extreme summertime North Atlantic Oscillation under climate change. *Communications Earth & Environment, 6*, 474. https://doi.org/10.1038/s43247-025-02422-x
 
-Luo, D., Lupo, A. R., & Wan, H. (2011). The variability of the Atlantic storm track and the North Atlantic Oscillation: A link between intraseasonal and interannual variability. *Journal of the Atmospheric Sciences, 68*(3), 577--601. https://doi.org/10.1175/2010JAS3579.1
+Luo, D., Diao, Y., & Feldstein, S. B. (2011). The variability of the Atlantic storm track and the North Atlantic Oscillation: A link between intraseasonal and interannual variability. *Journal of the Atmospheric Sciences, 68*(3), 577--601. https://doi.org/10.1175/2010JAS3579.1
 
-McKenna, C. M., Bracegirdle, T. J., Shonk, J. K. P., & Joshi, M. M. (2022). The role of the North Atlantic Oscillation for projections of winter mean precipitation in Europe. *Geophysical Research Letters, 49*, e2022GL099083. https://doi.org/10.1029/2022GL099083
+McKenna, C. M., & Maycock, A. C. (2022). The role of the North Atlantic Oscillation for projections of winter mean precipitation in Europe. *Geophysical Research Letters, 49*(19), e2022GL099083. <https://doi.org/10.1029/2022GL099083>
 
 Met Office. (n.d.). *The North Atlantic Oscillation*. Retrieved June 1, 2026, from https://www.metoffice.gov.uk/research/climate/seasonal-to-decadal/gpc-outlooks/ens-mean/nao-description
 
@@ -1228,7 +1226,9 @@ NOAA Physical Sciences Laboratory. (n.d.). *Climate timeseries: North Atlantic O
 
 Queralt, S., Hernández, E., Barriopedro, D., Gallego, D., Ribera, P., Casanova, C., & Paredes, D. (2009). North Atlantic Oscillation influence and weather types associated with winter total and extreme precipitation events in Spain. *Atmospheric Research, 94*(4), 675--683. https://doi.org/10.1016/j.atmosres.2009.09.005
 
-Riaz, S. M. F., Iqbal, M. J., & Athar, H. (2017). Impact of the North Atlantic Oscillation on winter climate of Germany. *Tellus A: Dynamic Meteorology and Oceanography, 69*(1), 1406263. https://doi.org/10.1080/16000870.2017.1406263
+Riaz, S. M. F., Iqbal, M. J., & Hameed, S. (2017). Impact of the North Atlantic Oscillation on winter climate of Germany. *Tellus A: Dynamic Meteorology and Oceanography, 69*(1), 1406263. https://doi.org/10.1080/16000870.2017.1406263
+
+Santos, J. F., Portela, M. M., & Pulido-Calvo, I. (2014). Spring drought prediction based on winter NAO and global SST in Portugal. *Hydrological Processes, 28*, 1009--1024. https://doi.org/10.1002/hyp.9641
 
 Svoboda, M., Hayes, M., & Wood, D. (2012). *Standardized Precipitation Index User Guide*. World Meteorological Organization, WMO-No. 1090.
 
