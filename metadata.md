@@ -4,7 +4,7 @@
 
 - Title: Influence of the North Atlantic Oscillation on extreme precipitation and drought in the Iberian Peninsula
 - Author: Laura Damien
-- nCourse: LGEO2185 – Advanced Geo-processing
+- Course: LGEO2185 – Advanced Geo-processing
 - Institution: UCLouvain
 - Study period: 1995–2025
 
@@ -18,11 +18,11 @@ Before running the analysis, users must download the data from the cloud folder 
 
 The dataset contains two main inputs:
 
-1. **ERA5 precipitation data**
-   Annual NetCDF files containing daily total precipitation for the Iberian Peninsula.
+1. **ERA5 precipitation data**:
+   Annual NetCDF files with daily total precipitation for the Iberian Peninsula.
 
-2. **Seasonal NAO index**
-   A CSV file containing seasonal North Atlantic Oscillation index values.
+2. **Seasonal NAO index**:
+   A CSV file with seasonal North Atlantic Oscillation index values.
 
 Expected local file structure:
 
