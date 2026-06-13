@@ -1,0 +1,1193 @@
+---
+title: "Influence of the North Atlantic Oscillation on extreme precipitation and drought in the Iberian Peninsula"
+author: "Laura Damien"
+format: 
+  html:
+    toc: true
+    toc-depth: 3   
+    theme: brite
+    number-sections: true
+    standalone: true
+    embed-resources: true
+editor: visual
+execute:
+  echo: true
+  warning: false
+  error: false
+  message: false
+---
+
+```{r include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE, 
+  warning = FALSE,
+  message = FALSE
+)
+```
+
+# Loading packages
+
+In order to complete the project, a series of packages is required to use functions and download data.
+
+```{r packages, message=FALSE, warning=FALSE}
+if (!require("pacman")) install.packages("pacman")
+
+pacman::p_load(
+  tidyverse,
+  lubridate,
+  terra,
+  ncdf4,
+  sf,
+  ggplot2,
+  paletteer,
+  rnaturalearth,
+  rnaturalearthdata,
+  SPEI,
+  ggspatial,
+  grid, 
+  ecmwfr
+)
+```
+
+# Project parameters
+
+The main methodological choices were defined at the start of the project. This makes the workflow more transparent and easier to adapt for another study period, region, or set of thresholds.
+
+```{r}
+# study period
+start_year <- 1995
+end_year <- 2025
+download_years <- (start_year - 1):end_year
+
+# study area
+area_north <- 45
+area_south <- 35
+area_west  <- -12
+area_east  <- 6
+
+study_area <- c(area_north, area_west, area_south, area_east)
+
+# extreme precipitation definition
+wet_day_threshold <- 0.1
+extreme_percentile <- 0.95
+
+# drought definition
+spi_scale <- 3
+drought_threshold <- -1.0
+
+# NAO phase definition
+nao_pos_threshold <- 0.5
+nao_neg_threshold <- -0.5
+
+# seasons
+season_levels <- c("DJF", "MAM", "JJA", "SON")
+```
+
+# Introduction
+
+Climate variability has an important influence on precipitation patterns in Europe. Large-scale atmospheric circulation modes can strongly affect both wet and dry extremes by changing the direction, strength, and frequency of moisture transport from the North Atlantic. One of the most important modes of atmospheric variability in the North Atlantic--European region is the North Atlantic Oscillation (NAO). The NAO is a measure of the fluctuations in air pressure between the subtropical high-pressure system near the Azores and the low-pressure system near Iceland. Changes in this pressure gradient influence the strength and location of the westerly winds, storm tracks and the supply of moisture to Western Europe and the Iberian Peninsula (NOAA NCEI, n.d.). A simplified illustration of the NAO circulation pattern and the study area is shown in Figure 1.
+
+```{r}
+# country borders
+coast <- ne_countries(scale = "medium", returnclass = "sf")
+
+# study area
+study_box <- st_as_sfc(
+  st_bbox(
+    c(xmin = -12, xmax = 6, ymin = 35, ymax = 45),
+    crs = st_crs(4326)
+  )
+)
+
+# plot
+ggplot() +
+  geom_sf(data = coast, fill = "grey90", colour = "grey40", linewidth = 0.3) +
+  geom_sf(data = study_box, fill = NA, colour = "red", linewidth = 1) +
+  annotate(
+    "point",
+    x = -28, y = 38,
+    size = 10,              # bigger circle
+    shape = 21,
+    fill = "white",
+    colour = "black",
+    stroke = 1
+  ) +
+  annotate(
+    "text",
+    x = -28, y = 36.2,
+    label = "Azores High",
+    size = 4.5,
+    fontface = "bold"
+  ) +
+  annotate(
+    "text",
+    x = -28, y = 38,
+    label = "H",
+    size = 7,             
+    fontface = "bold"
+  ) +
+  
+  annotate(
+    "point",
+    x = -22, y = 64,
+    size = 10,            
+    shape = 21,
+    fill = "white",
+    colour = "black",
+    stroke = 1
+  ) +
+  annotate(
+    "text",
+    x = -22, y = 66.2,
+    label = "Icelandic Low",
+    size = 4.5,
+    fontface = "bold"
+  ) +
+  annotate(
+    "text",
+    x = -22, y = 64,
+    label = "L",
+    size = 7,             
+    fontface = "bold"
+  ) +
+  
+  # pressure line
+  geom_segment(
+    aes(x = -28, y = 38, xend = -22, yend = 64),
+    linetype = "dashed",
+    linewidth = 0.6,
+    colour = "black"
+  ) +
+  
+  # positive NAO storm track
+  geom_curve(
+    aes(x = -45, y = 50, xend = 5, yend = 56),
+    curvature = 0.15,
+    linewidth = 1,
+    arrow = arrow(length = unit(0.25, "cm")),
+    colour = "blue"
+  ) +
+  annotate(
+    "text",
+    x = -20, y = 57.5,
+    label = "Positive NAO:\nstorm track shifts north",
+    colour = "blue",
+    size = 5
+  ) +
+  
+  # negative NAO storm track 
+  geom_curve(
+    aes(x = -45, y = 42, xend = 2, yend = 39),
+    curvature = -0.12,
+    linewidth = 1,
+    arrow = arrow(length = unit(0.25, "cm")),
+    colour = "darkgreen"
+  ) +
+  annotate(
+    "text",
+    x = -20, y = 41,
+    label = "Negative NAO:\nstorm track shifts south",
+    colour = "darkgreen",
+    size = 5
+  ) +
+  
+  # study area 
+  annotate(
+    "text",
+    x = -3, y = 33.5,
+    label = "Study area:\nIberian Peninsula",
+    size = 5,
+    colour = "red"
+  ) +
+  
+  # map extent
+  coord_sf(
+    xlim = c(-50, 15),
+    ylim = c(30, 70),
+    expand = FALSE
+  ) +
+  
+  # scale bar and north arrow
+  annotation_scale(location = "bl", width_hint = 0.25) +
+  annotation_north_arrow(
+    location = "tr",
+    which_north = "true",
+    style = north_arrow_fancy_orienteering
+  ) +
+  
+  labs(
+    title = "Study region and simplified NAO circulation pattern",
+    x = "Longitude",
+    y = "Latitude"
+  ) +
+  
+  theme_bw(base_size = 11) +
+  theme(
+    panel.grid = element_line(colour = "grey85", linewidth = 0.2),
+    plot.title = element_text(face = "bold", size = 14),
+    axis.text = element_text(size = 13, colour = "black"),
+    axis.title = element_text(size = 12)
+  )
+```
+
+***Figure 1.** Study region and simplified NAO circulation pattern.*
+
+The NAO affects climate conditions in Europe throughout the year, but its influence is strongest in winter. During a positive NAO phase, the pressure gradient over the North Atlantic is stronger. This strengthens the westerly flow and often brings wetter conditions to Northern Europe and drier conditions to Southern Europe. During a negative NAO phase, the pressure gradient is weaker. The westerly flow into Northern Europe is reduced, and storm activity can shift farther south. This can bring wetter conditions to parts of Southern Europe and the Mediterranean (NOAA PSL, n.d.; NOAA NCEI, n.d.; Met Office, n.d.). However, the influence of the NAO on extreme events, such as heavy precipitation and drought, is more complex. These relationships can vary by season, location, and the type of extreme events (Tabari & Willems, 2018; Fuentes-Franco et al., 2023; Liu et al., 2025).
+
+This is an important issue because both heavy rainfall and drought can have strong impacts on society and the environment. Extreme precipitation can increase flood risk, cause soil erosion, damage infrastructure, and affect settlements. In contrast, long dry periods can reduce water availability, affect agriculture, increase wildfire risk, and place stress on ecosystems. The Iberian Peninsula is an important region to study because it is strongly influenced by Atlantic circulation. It also regularly experiences both intense rainfall events and periods of drought (European Environment Agency, 2024; Claro et al., 2023).
+
+The aim of this project is therefore to study the influence of the NAO on hydroclimate extremes in the Iberian Peninsula. More specifically, the analysis focuses on extreme precipitation events and drought conditions using ERA5 precipitation data and a seasonal NAO index for the period 1995 to 2025. The objective is to assess whether different NAO phases are associated with clear spatial and seasonal patterns in wet and dry extremes across the region.
+
+# Research objectives
+
+The aim of this study is to investigate the influence of the North Atlantic Oscillation (NAO) on hydroclimate extremes in the Iberian Peninsula. This study aims to:
+
+-   Identify extreme precipitation events using ERA5 daily precipitation data
+-   Analyze seasonal variability of extremes
+-   Examine the relationship between NAO phases and extreme precipitation
+-   Assess statistical correlations between NAO and precipitation extremes
+-   Investigate drought conditions using the Standardized Precipitation Index (SPI)
+-   Compare the influence of NAO on wet and dry extremes
+
+# Methodology
+
+The study is structured around several main steps: data acquisition, preprocessing, identification of extreme events, seasonal aggregation, NAO phase classification, drought analysis, and statistical analysis. The general workflow is shown in Figure 2. The first part of the methodology is the same for both extreme precipitation and drought analyses. Both analyses use the same ERA5 precipitation data, the same study period, the same seasonal structure and the same NAO index. The method then splits into two parts: one for extreme precipitation and one for drought. The two analyses are then brought together again when the NAO phase comparison and statistical testing are applied.
+
+The methodology for identifying extreme precipitation events is based on that of Alizadeh and Mousavizadeh (2025). In their study, extreme precipitation was defined as daily precipitation greater than the 95th percentile of wet days, where wet days were defined as days with at least 0.1 mm of rainfall. For this project, the same method based on threshold values is used, but applied to a different region and climate index. Instead of studying the effects of ENSO in Southwest Asia, the method is applied in this study to the NAO and hydroclimatic extremes in the Iberian Peninsula.
+
+The drought analyses form an additional part of this study and are not based on Alizadeh and Mousavizadeh (2025). They are based on the standardised precipitation index on a three-month timescale, SPI-3, which is frequently used to identify meteorological drought conditions across various timescales (Svoboda et al., 2012; NCAR Climate Data Guide, n.d.).
+
+```{mermaid}
+flowchart TD
+    A[ERA5 daily precipitation data] --> B[Convert precipitation from m to mm]
+
+    B --> C[Extreme precipitation analysis]
+    B --> D[Drought analysis]
+
+    C --> E[Select wet days: precipitation >= 0.1 mm]
+    E --> F[Calculate 95th percentile threshold per grid cell]
+    F --> G[Identify extreme precipitation days]
+    G --> H[Assign seasons and season years]
+    H --> I[Count extreme precipitation days per grid cell, season, and year]
+    I --> J[Calculate seasonal spatial means and regional averages]
+
+    D --> K[Aggregate daily precipitation to monthly totals]
+    K --> L[Calculate SPI-3 per grid cell]
+    L --> M[Identify drought months: SPI-3 <= -1]
+    M --> N[Assign drought months to seasons]
+    N --> O[Count drought months per grid cell, season, and year]
+
+    P[Seasonal NAO index] --> Q[Classify NAO phases: positive, neutral, negative]
+
+    I --> R[Join extreme precipitation data with NAO phases]
+    O --> S[Join drought data with NAO phases]
+    Q --> R
+    Q --> S
+
+    R --> T[Compare extreme precipitation between NAO phases]
+    R --> U[Welch t-tests for extreme precipitation]
+    R --> V[Pearson correlation with extreme precipitation]
+
+    S --> W[Compare drought between NAO phases]
+    S --> X[Welch t-tests for drought]
+    S --> Y[Pearson correlation with drought]
+```
+
+***Figure 2.** Workflow*
+
+## Data acquisition
+
+Daily precipitation data were obtained from the ERA5 reanalysis dataset using the ecmwfr package in R. ERA5 is the fifth-generation ECMWF atmospheric reanalysis and provides a consistent record of atmospheric and surface climate variables (Copernicus Climate Change Service, 2024). The total precipitation variable was downloaded from the ERA5-derived daily statistics dataset as daily sums based on hourly data. Data were downloaded for the period 1994--2025 and stored as annual NetCDF files for further processing. The download code is set to `eval=FALSE`, so the ERA5 files should already be available in the `data` folder when the rest of the document is run. The downloaded domain covers the Iberian Peninsula, bounded by 45°N to 35°N and 12°W to 6°E. The same ERA5 precipitation data were used for both analyses: daily values for extreme precipitation and monthly totals for drought.
+
+```{r era5-download, eval=FALSE}
+# credentials
+wf_set_key(user = "cds",
+           key = "YOUR-API-KEY")
+
+# period 
+months <- sprintf("%02d", 1:12)
+days <- sprintf("%02d", 1:31)
+
+# loop from 1994 to 2025
+for (yr in download_years) {
+  request <- list(
+    dataset_short_name = "derived-era5-single-levels-daily-statistics",
+    product_type       = "reanalysis",
+    variable           = "total_precipitation",
+    year               = as.character(yr),
+    month              = months,
+    day                = days,
+    daily_statistic    = "daily_sum",
+    time_zone          = "utc+00:00",
+    frequency          = "1_hourly",
+    area               = study_area, 
+    format             = "netcdf",
+    target             = paste0("era5_total_precipitation_", yr, ".nc")
+  )
+  
+  wf_request(
+    user     = "cds",
+    request  = request,
+    transfer = TRUE,
+    path     = "data"
+  )
+}
+```
+
+The seasonal NAO index was obtained from the NCAR Climate Data Guide. The PC-based Hurrell NAO index was used, which describes the main pattern of sea-level pressure variability over the North Atlantic. The dataset contains seasonal values for winter (DJF), spring (MAM), summer (JJA) and autumn (SON) (Hurrell, n.d.).
+
+```{r}
+nao_seasonal <- read_csv("NAO_index.csv") %>%
+  rename(season_year = Year) %>%
+  pivot_longer(
+    cols = c(DJF, MAM, JJA, SON),
+    names_to = "season",
+    values_to = "nao"
+  ) %>%
+  mutate(
+    season_year = as.integer(season_year),
+    season = factor(season, levels = season_levels),
+    phase = case_when(
+      nao >= nao_pos_threshold ~ "POS",
+      nao <= nao_neg_threshold ~ "NEG",
+      TRUE ~ "NEU"
+    )
+  )
+```
+
+## Data preprocessing
+
+The ERA5 NetCDF files were processed using the terra, ncdf4, and dplyr/tidyr packages in R. For each year, precipitation data were loaded as raster layers representing daily precipitation values. The time information was extracted from the valid_time variable and converted to a standard date format. These dates were then assigned to the corresponding raster layers to ensure correct temporal alignment.
+
+Thereafter, all annual raster datasets were merged into a single raster object with multiple layers representing a continuous series of daily precipitation values for the study period. The raster data were then converted into a dataframe, with each row corresponding to a specific grid cell and date. Finally, precipitation values were converted from metres to millimetres by multiplying by 1000.
+
+```{r}
+# function to load one year
+load_yearly_data <- function(year, path = "data") {
+  
+  file <- file.path(path, paste0("era5_total_precipitation_", year, ".nc"))
+  
+  r <- rast(file, subds = "tp")
+  
+  nc <- nc_open(file)
+  time_units <- ncatt_get(nc, "valid_time", "units")$value
+  time_vals <- ncvar_get(nc, "valid_time")
+  
+  origin_date <- sub("days since ", "", time_units)
+  dates <- as.Date(time_vals, origin = origin_date)
+  
+  nc_close(nc)
+  
+  names(r) <- as.character(dates)
+  
+  return(r)
+}
+
+# years available
+years <- download_years
+
+r_all <- do.call(c, lapply(years, load_yearly_data))
+
+df_all <- as.data.frame(r_all, xy = TRUE)
+
+df_long <- df_all %>%
+  pivot_longer(-c(x,y), names_to="date", values_to="precip") %>%
+  mutate(date = as.Date(date),
+         precip = precip * 1000)
+```
+
+## Parameter choices
+
+To ensure the workflow remained transparent and reproducible, a number of methodological choices were made at the start of the analysis. A rainy day was defined as a day with at least 0.1 mm of precipitation. Extreme precipitation was defined as precipitation that, for each grid cell, exceeded the local 95th percentile for rainy days. NAO phases were classified as positive when NAO ≥ 0.5, as negative when NAO ≤ −0.5, and as neutral in all other cases. Months with drought were identified using SPI-3, with drought defined as SPI-3 ≤ −1. These thresholds are commonly used in hydroclimatological studies (Climdex, n.d.; NCAR Climate Data Guide, n.d.; Fuentes-Franco et al., 2023).
+
+These parameter choices are used later in the two separate analyses. The 0.1 mm and 95th percentile thresholds are used for extreme precipitation, while the SPI-3 threshold is used for drought. The NAO phase thresholds are used for both analyses.
+
+## Extreme precipitation analysis
+
+Extreme precipitation events were selected using percentiles. First, only wet days were identified, those days are defined as days with at least 0.1 mm of precipitation. This step removes dry days and very small amounts of rainfall from the calculation. For each grid cell, the 95th percentile of wet-day precipitation was then calculated and used as a local threshold for extreme rainfall.
+
+A day was classified as an extreme precipitation event when precipitation at that grid cell was higher than its 95th percentile threshold. This is useful because rainfall amounts vary across the study area. This method follows Alizadeh and Mousavizadeh (2025), who also defined extreme precipitation as daily rainfall above the 95th percentile of wet days.
+
+```{r}
+# a wet day is defined as one with at least 0.1 mm rainfall
+wet_days <- df_long %>%
+  filter(precip >= wet_day_threshold)  
+
+# find 95percentile
+thresholds <- wet_days %>%
+  group_by(x, y) %>%
+  summarise(p95 = quantile(precip, extreme_percentile, na.rm = TRUE), .groups = "drop")
+
+# filter those with threshold
+extreme_days <- wet_days %>%
+  inner_join(thresholds, by = c("x", "y")) %>%
+  filter(precip > p95)
+```
+
+### Seasonal aggregation of extreme precipitation
+
+Each extreme precipitation day was assigned to a meteorological season based on its month: winter (DJF), spring (MAM), summer (JJA), or autumn (SON) based on the month. The winter season (DJF) includes December and it is grouped with January and February of the following year. The analysis begins with DJF 1995 (including December 1994) and ends with SON 2025, so that four full seasons per year are used for 31 years (from 1995 to 2025).
+
+```{r}
+# make the seaons
+extreme_days <- extreme_days %>%
+  mutate(
+    month = lubridate::month(date),
+    season = case_when(
+      month %in% c(12, 1, 2) ~ "DJF",
+      month %in% c(3, 4, 5) ~ "MAM",
+      month %in% c(6, 7, 8) ~ "JJA",
+      month %in% c(9, 10, 11) ~ "SON"
+    ),
+    season_year = case_when(
+      month == 12 ~ lubridate::year(date) + 1,
+      TRUE ~ lubridate::year(date)
+    )
+  ) 
+```
+
+To analyze patterns in time and space, the number of days with extreme precipitation was calculated for each grid cell, season, and year. The `seasonal_extremes` data set shows how many extreme precipitation days occurred at each location for every season and year across the study period.
+
+```{r}
+# number of extreme days by grid cell and season and year
+seasonal_extremes <- extreme_days %>%
+  group_by(x, y, season_year, season) %>%
+summarise(n_extreme_days = n(), .groups = "drop")
+```
+
+Then the complete dataset was generated for analysis by creating all combinations of grid cell coordinates (x, y) with meteorological seasons (DJF, MAM, JJA, SON) and years from 1995 to 2025. This complete grid was combined with the `seasonal_extremes` dataset, which contained the previously calculated numbers of extreme precipitation days. For the missing values, which indicated the absence of extreme precipitation events for a given grid cell, season, and year, the dataset was filled with zeros.
+
+```{r}
+# whole dataset with also 0 events
+seasonal_ext_full <- expand_grid(
+  x = unique(seasonal_extremes$x),
+  y = unique(seasonal_extremes$y),
+  season_year = start_year:end_year,
+  season = factor(c("DJF", "MAM", "JJA", "SON"),
+                  levels = season_levels)
+) %>%
+  left_join(seasonal_extremes,
+            by = c("x", "y", "season_year", "season")) %>%
+  mutate(n_extreme_days = replace_na(n_extreme_days, 0))
+```
+
+For each grid cell, the average number of extreme precipitation days per season over the entire period 1995-2025 was calculated. To do this, the entire dataset was grouped by location and season and the average number of extreme events was calculated. The seasons were ordered as DJF, MAM, JJA, and SON to make the results easier to interpret and plot.
+
+```{r}
+# taking the mean and correct sequence
+era_mean <- seasonal_ext_full %>%
+  group_by(x, y, season) %>%                     
+  summarise(mean_days = mean(n_extreme_days),    
+            .groups = "drop")
+
+era_mean$season <- factor(era_mean$season,
+                          levels = season_levels)
+```
+
+The mean count of extreme precipitation days per season for the area was determined by averaging data from all grid cells to track regional changes over time. The complete dataset was grouped by season and year before calculating the average number of extreme days for each combination. This time series shows seasonal averages which demonstrate the overall regional patterns of extreme precipitation events.
+
+```{r}
+# take the average/season/year
+regional_avg <- seasonal_ext_full %>%          
+  group_by(season_year, season) %>%           
+  summarise(avg_extreme_days = mean(n_extreme_days), .groups = "drop") %>%
+  mutate(
+    season = factor(season, levels = season_levels)
+  )
+```
+
+## Drought analysis
+
+Drought was analysed using the Standardized Precipitation Index (SPI) at a scale of three months (SPI-3). First, the monthly precipitation totals were calculated from the daily data. Missing months were filled in to make a continuous time series, which is needed to calculate SPI. The SPI-3 index was then calculated for each grid cell using the SPEI package. Drought events were defined as periods where SPI values were at or below −1. This means moderate to severe drought conditions.
+
+Unlike the analysis of extreme precipitation, the analysis of drought does not use daily percentile thresholds. This analysis is based on monthly precipitation deficits measured using the SPI-3. For the seasonal analysis, February represents DJF, May represents MAM, August represents JJA and November represents SON, because these months mark the end of each SPI period of three months.
+
+```{r}
+# monthly prec totals
+monthly_precip <- df_long %>%
+  mutate(date_month = lubridate::floor_date(date, "month")) %>%
+  group_by(x, y, date_month) %>%
+  summarise(total_precip = sum(precip, na.rm = TRUE), .groups = "drop")
+
+
+# monthly time series 
+full_months <- seq(min(monthly_precip$date_month),
+                   max(monthly_precip$date_month),
+                   by = "1 month")
+monthly_precip_full <- monthly_precip %>%
+  group_by(x, y) %>%
+  tidyr::complete(date_month = full_months) %>%
+  mutate(total_precip = replace_na(total_precip, 0)) %>%
+  arrange(date_month) %>%
+  ungroup()
+
+# calculate SPI-3
+spi_grid <- monthly_precip_full %>%
+  group_by(x, y) %>%
+  arrange(date_month) %>%
+  mutate(
+    spi_3 = suppressMessages(
+      as.numeric(SPEI::spi(total_precip, scale = spi_scale)$fitted)
+    )
+  ) %>%
+  ungroup()
+
+# select seasonal SPI-3 drought months
+drought_events <- spi_grid %>%
+  mutate(month = month(date_month)) %>%
+  filter(month %in% c(2, 5, 8, 11)) %>%  
+  filter(spi_3 <= drought_threshold) %>%
+  mutate(
+    season = case_when(
+      month == 2 ~ "DJF",
+      month == 5 ~ "MAM",
+      month == 8 ~ "JJA",
+      month == 11 ~ "SON"
+    ),
+    season_year = year(date_month)
+  )
+```
+
+The number of drought months was counted for each grid cell, year, and season. A complete grid was then created to include seasons with no drought events, which were filled with zeros. The drought dataset was then joined with the NAO dataset so that drought frequency could be compared between NAO phases.
+
+```{r}
+# count drought months by grid cell and season and year
+drought_count <- drought_events %>%
+  group_by(x, y, season, season_year) %>%
+  summarise(n_drought_months = n(), .groups = "drop") 
+  
+# whole dataset with also 0 events
+full_drought_grid <- expand_grid(
+  x = unique(drought_count$x),
+  y = unique(drought_count$y),
+  season_year = start_year:end_year,
+  season = factor(c("DJF", "MAM", "JJA", "SON"), levels = season_levels)
+)
+
+drought_seasonal_full <- full_drought_grid %>%
+  left_join(drought_count, by = c("x", "y", "season", "season_year")) %>%
+  mutate(n_drought_months = replace_na(n_drought_months, 0))  %>%
+  left_join(nao_seasonal, by = c("season", "season_year"))
+```
+
+## NAO comparison and statistical testing
+
+Both the extreme precipitation dataset and the drought dataset are compared with the same seasonal NAO index and NAO phase classification.
+
+### Extreme precipitation and NAO
+
+The dataset of extreme precipitation days for each season was combined with the seasonal NAO index by matching both season and year.
+
+```{r}
+# join NAO to seasonal extremes
+ext_phase <- seasonal_ext_full %>%
+  left_join(nao_seasonal, by = c("season_year", "season"))
+```
+
+The average number of days with extreme precipitation was calculated for each NAO phase: positive, negative and neutral. This was calculated for each grid cell and each season. The average during neutral NAO phases was then used as a reference. Differences were calculated between the positive and neutral NAO phases, and between the negative and neutral NAO phases.
+
+These differences reveal whether days with extreme precipitation occurred more or less frequently during positive or negative phases of the NAO compared with neutral phases. Positive differences indicate that there were more days with extreme precipitation during that phase of the NAO, whilst negative differences indicate that there were fewer days with extreme precipitation.
+
+```{r}
+# mean extreme days for each phase
+phase_mean <- ext_phase %>%
+  group_by(x, y, season, phase) %>%
+  summarise(mean_days = mean(n_extreme_days), .groups = "drop") %>%
+  pivot_wider(names_from = phase, values_from = mean_days)
+
+# differences from neutral NAO
+phase_mean <- phase_mean %>%
+  mutate(diff_pos = POS - NEU,
+         diff_neg = NEG - NEU)
+
+
+```
+
+To test whether the differences in the frequency of extreme precipitation between NAO phases were statistically significant, Welch's t-tests were used. This Welch t-test compares the mean values of two groups, even if their variances are different. The tests compared positive NAO phases with neutral phases, and negative NAO phases with neutral phases, separately for each grid cell and each season.
+
+```{r}
+# Welch t-tests
+welch_fun <- function(a, b) {
+  if (length(a) < 2 || length(b) < 2) return(NA_real_)
+  if (all(is.na(a)) || all(is.na(b))) return(NA_real_)
+  if (sd(a, na.rm = TRUE) == 0 || sd(b, na.rm = TRUE) == 0) return(NA_real_)
+  t.test(a, b, var.equal = FALSE)$p.value
+}
+
+pvals <- ext_phase %>%
+  filter(!is.na(phase)) %>%
+  group_by(x, y, season) %>%
+  summarise(
+    p_pos = welch_fun(n_extreme_days[phase == "POS"],
+                      n_extreme_days[phase == "NEU"]),
+    p_neg = welch_fun(n_extreme_days[phase == "NEG"],
+                      n_extreme_days[phase == "NEU"]),
+    .groups = "drop"
+  )
+
+# combine differences and p-values for the maps
+plot_df <- phase_mean %>%
+  left_join(pvals, by = c("x", "y", "season")) %>%
+  mutate(season = factor(season, levels = season_levels))
+```
+
+Pearson correlation coefficients were also calculated between the seasonal NAO index and the number of days with extreme precipitation. The Pearson correlation measures the strength and direction of a linear relationship between two variables. This was done for each grid cell and each season to investigate whether higher NAO values were associated with more or fewer days of extreme precipitation. The p-values were used to determine where the differences or associations were statistically significant.
+
+```{r}
+# Pearson correlation between NAO and extreme precipitation days
+cor_grid <- ext_phase %>%
+  filter(!is.na(nao)) %>%
+  group_by(x, y, season) %>%
+  summarise(
+    r = cor(n_extreme_days, nao, method = "pearson"),
+    pval = cor.test(n_extreme_days, nao)$p.value,
+    .groups = "drop"
+  ) %>%
+  mutate(
+    season = factor(season, levels = season_levels)
+  )
+```
+
+### Drought and NAO
+
+The drought dataset was also compared with the seasonal NAO index by matching season and year. Differences in drought frequency were calculated between positive and neutral NAO phases and between negative and neutral NAO phases. As for extreme precipitation, Welch t-tests were used to assess whether the differences between NAO phases were statistically significant. The average during neutral NAO phases was used as the reference. Differences were calculated between positive and neutral NAO phases, and between negative and neutral NAO phases. These differences reveal whether dry months occurred more or less frequently during positive or negative NAO phases compared with neutral phases. Positive differences indicate more dry months, whilst negative differences indicate fewer dry months.
+
+```{r}
+# mean drought months for each NAO phase
+phase_mean2 <- drought_seasonal_full %>%
+  group_by(x, y, season, phase) %>%
+  summarise(mean_droughts = mean(n_drought_months), .groups = "drop") %>%
+  pivot_wider(names_from = phase, values_from = mean_droughts) %>%
+  mutate(
+    diff_pos = POS - NEU,
+    diff_neg = NEG - NEU
+  )
+```
+
+To test whether the differences in drought frequency between the NAO phases were statistically significant, Welch's t-tests were used. In these tests, positive NAO phases were compared with neutral phases, and negative NAO phases with neutral phases, separately for each grid cell and each season.
+
+```{r}
+# Welch t-tests
+welch_fun <- function(a, b) {
+  if (length(a) < 2 || length(b) < 2 || all(is.na(a)) || all(is.na(b)) ||
+      sd(a, na.rm = TRUE) == 0 || sd(b, na.rm = TRUE) == 0)
+    return(NA_real_)
+  t.test(a, b, var.equal = FALSE)$p.value
+}
+
+pvals <- drought_seasonal_full %>%
+  filter(!is.na(phase)) %>%  
+  group_by(x, y, season) %>%
+  summarise(
+    p_pos = welch_fun(n_drought_months[phase == "POS"],
+                      n_drought_months[phase == "NEU"]),
+    p_neg = welch_fun(n_drought_months[phase == "NEG"],
+                      n_drought_months[phase == "NEU"]),
+    .groups = "drop"
+  )
+
+# combine differences and p-values for the maps
+plot_df2 <- phase_mean2 %>%
+  left_join(pvals, by = c("x", "y", "season")) %>%
+  mutate(season = factor(season, levels = season_levels))
+```
+
+For each grid cell and each season, Pearson correlation coefficients were also calculated between the seasonal NAO index and the number of SPI-3 drought months. The aim was to determine whether higher NAO values were associated with more or fewer drought months. The p-values were used to identify where the correlations were statistically significant.
+
+```{r}
+# pearson correlation between NAO and drought months
+drought_cor_grid <- drought_seasonal_full %>%
+  filter(!is.na(nao)) %>%
+  group_by(x, y, season) %>%
+  summarise(
+    r = cor(n_drought_months, nao, method = "pearson"),
+    pval = cor.test(n_drought_months, nao)$p.value,
+    .groups = "drop"
+  ) %>%
+  mutate(
+    season = factor(season, levels = season_levels)
+  )
+```
+
+# Result
+
+## Spatial distribution of extreme precipitation
+
+Figure X shows the average number of extreme precipitation days for each season during 1995--2025. In other words, it shows how many days per season usually had very heavy rainfall at each location.
+
+The threshold for an "extreme" day was calculated separately for every grid cell. This means that each place is compared with its own normal rainfall conditions. Therefore, the map does not simply show the wettest places. Instead, it shows where very unusual rainfall events happened more often for that specific location. A high value on the map means that extreme rainfall days occurred more frequently in that season. A low value means that extreme rainfall days were less common.
+
+In winter (DJF), extreme rainfall happens most often in the north and west of the area, especially closer to the Atlantic side. The east and south-east are lighter on the map, so extreme rainfall is less frequent there.
+
+In spring (MAM), the pattern is less strong. The colours are more similar across the map, which means that extreme precipitation is more evenly spread. There are still some wetter spots in the central and northern parts, but overall spring looks more mixed.
+
+In summer (JJA), extreme precipitation almost disappears in much of the Iberian Peninsula. Most of the south and west are very light, showing very few extreme rainfall days. The main exception is the Pyrenees and north-eastern Spain, where extreme rainfall is still more common.
+
+In autumn (SON), the map becomes much darker again. Extreme precipitation is frequent across much of the region, especially on the Atlantic/western side and in the north. This shows that autumn is one of the most important seasons for heavy rainfall in the study area.
+
+```{r}
+coast <- ne_countries(scale = "medium", returnclass = "sf")
+
+ggplot(era_mean) +
+  geom_raster(aes(x, y, fill = mean_days)) +
+  geom_sf(data = coast, colour = "black", fill = NA, linewidth = 0.2) +
+  coord_sf(xlim = c(-12, 6), ylim = c(35, 45), expand = FALSE) +  
+  
+  # 2 columns, 2 rows
+  facet_wrap(~ season, ncol = 2) +       
+  
+  scale_fill_paletteer_c(
+    palette = "grDevices::Oslo",
+    n = 30,
+    limits = c(0, 6),
+    breaks = seq(0, 6, 0.5),     
+    name = "Extreme days / season",
+    guide = guide_colorbar(
+      nbin = 41,             
+      barheight = unit(8, "cm"),
+      barwidth = unit(0.8, "cm"))
+  ) +
+  labs(
+    title = "Mean seasonal frequency of extreme precipitation days (1995–2025)",
+    x = NULL, y = NULL
+  ) +
+  theme_bw(base_size = 14) +
+  theme(
+    panel.grid = element_blank(),
+    strip.text = element_text(size = 15, face = "bold"),
+    axis.text = element_text(size = 13),
+    plot.title = element_text(size = 17, face = "bold"),
+    legend.title = element_text(size = 13),
+    legend.text = element_text(size = 13),
+    strip.placement = "outside"
+  )
+
+```
+
+## Temporal variability of extreme precipitation
+
+Figure X shows the seasonal average number of extreme precipitation days for each year. This regional average was calculated by averaging the number of extreme days across all grid cells. There is no clear upward or downward trend; instead, some individual years stand out with much higher values.
+
+Winter (DJF) has some large peaks, especially in 1996 and 2010, showing that these years had many winter extreme rainfall days. Autumn (SON) is also often high, for example in 1997, 2003, 2006, 2012, 2014. Autumn and winter are the most important seasons for extreme precipitation. Spring (MAM) usually has moderate values, while summer (JJA) is clearly the lowest season in almost all years.
+
+```{r}
+
+#plot of time series
+ggplot(regional_avg, aes(factor(season_year), avg_extreme_days, fill = season)) +
+  geom_bar(stat = "identity",
+           position = position_dodge(width = 0.8),
+           width = 0.9,
+           colour = "black") +
+  scale_fill_manual(values = c(DJF = "blue2", MAM = "chartreuse3",
+                               JJA = "red", SON = "grey50")) +
+  labs(title = "Seasonal average of extreme precipitation days",
+       x = "Year", y = "Extreme precipitation days") +
+  theme_bw() +
+  theme(panel.grid.major.x = element_blank(),
+        legend.position = "top")
+
+
+```
+
+## NAO influence on extreme precipitation
+
+### Positive NAO phase
+
+Figure X shows the difference in the mean number of extreme precipitation days between positive NAO phases and neutral NAO phases. Negative values mean fewer extreme precipitation days during positive NAO conditions compared with neutral conditions, while positive values mean more extreme precipitation days. The black crosses in the grid cells show where the difference is statistically significant at the 0.05 level according to the Welch t-test.
+
+The clearest pattern is in winter (DJF). Most of Iberia, especially the west and south-west, has fewer extreme precipitation days during positive NAO. This matches the idea that positive NAO often brings drier conditions to the Iberian Peninsula. In spring (MAM), the pattern is more mixed, with some wetter areas in the east and north-east and drier areas in the west. In summer (JJA), the differences are small and scattered, so the NAO effect seems weak. In autumn (SON), there are both wetter and drier areas, but no simple pattern. So, positive NAO mainly reduces extreme precipitation in winter, while its effect in the other seasons is weaker and more variable.
+
+```{r}
+to_map <- plot_df %>%
+  select(x, y, season, diff = diff_pos, pval = p_pos)
+
+coast <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sf")
+
+ggplot(to_map) +
+  geom_raster(aes(x, y, fill = diff)) +
+  geom_sf(data = coast, colour = "black", fill = NA, linewidth = 0.2) +
+  geom_point(
+    data = subset(to_map, pval < 0.05),
+    aes(x, y),
+    shape = 3, size = 0.3, colour = "black"
+  ) +
+  coord_sf(
+    xlim = c(-12, 6),
+    ylim = c(35, 45),
+    expand = FALSE
+  ) +
+  
+  # 2 columns, 2 rows
+  facet_wrap(~ season, ncol = 2) +
+  
+  scale_fill_paletteer_c(
+    "grDevices::Vik",
+    direction = -1,
+    limits = c(-3, 3),
+    breaks = seq(-3, 3, 1),
+    name = "Δ extreme days\n(POS – NEU)",
+    guide = guide_colorbar(
+      nbin = 300,
+      barheight = unit(8, "cm")
+    )
+  ) +
+  labs(
+    title = "NAO influence on extreme precipitation",
+    subtitle = "Positive NAO phase minus neutral",
+    x = NULL, y = NULL
+  ) +
+  theme_bw(base_size = 14) +
+  theme(
+    panel.grid = element_blank(),
+    strip.text = element_text(size = 15, face = "bold"),
+    axis.text = element_text(size = 13),
+    plot.title = element_text(size = 17, face = "bold"),
+    plot.subtitle = element_text(size = 14),
+    legend.title = element_text(size = 13),
+    legend.text = element_text(size = 13),
+    strip.placement = "outside"
+  )
+
+```
+
+### Negative NAO phase
+
+Figure X shows the difference in the mean number of extreme precipitation days between negative NAO phases and neutral NAO phases. Negative values mean fewer extreme precipitation days during negative NAO conditions compared with neutral conditions, while positive values mean more extreme precipitation days. The black crosses in the grid cells show where the difference is statistically significant at the 0.05 level according to the Welch t-test.
+
+The clearest pattern is again in winter (DJF). Much of the western part of Iberia, especially Portugal and the north-west, has more extreme precipitation days during negative NAO. This matches the idea that negative NAO often brings wetter conditions to the Iberian Peninsula. In spring (MAM), the pattern is weaker and mostly slightly negative, meaning fewer extreme precipitation days in many areas. In summer (JJA), the differences are small and scattered, so the NAO effect seems weak. In autumn (SON), there are also mixed patterns, with some wetter areas in the north-west but fewer extreme days in parts of the east and south-east. So, negative NAO mainly increases extreme precipitation in winter, especially in the western part of Iberia, while its effect in the other seasons is weaker and more variable.
+
+```{r}
+to_map2 <- plot_df %>%
+  select(x, y, season, diff = diff_neg, pval = p_neg)
+
+coast <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sf")
+
+ggplot(to_map2) +
+  geom_raster(aes(x, y, fill = diff)) +
+  geom_sf(data = coast, colour = "black", fill = NA, linewidth = 0.2) +
+  geom_point(
+    data = subset(to_map2, pval < 0.05),
+    aes(x, y),
+    shape = 3, size = 0.3, colour = "black"
+  ) +
+  coord_sf(
+    xlim = c(-12, 6),
+    ylim = c(35, 45),
+    expand = FALSE
+  ) +
+  
+  # 2 columns, 2 rows
+  facet_wrap(~ season, ncol = 2) +
+  
+  scale_fill_paletteer_c(
+    "grDevices::Vik",
+    direction = -1,
+    limits = c(-5, 7),
+    breaks = seq(-5, 7, 1),
+    name = "Δ extreme days\n(NEG – NEU)",
+    guide = guide_colorbar(
+      nbin = 300,
+      barheight = unit(8, "cm")
+    )
+  ) +
+  labs(
+    title = "NAO influence on extreme precipitation",
+    subtitle = "Negative NAO phase minus neutral",
+    x = NULL, y = NULL
+  ) +
+  theme_bw(base_size = 14) +
+  theme(
+    panel.grid = element_blank(),
+    strip.text = element_text(size = 15, face = "bold"),
+    axis.text = element_text(size = 13),
+    plot.title = element_text(size = 17, face = "bold"),
+    plot.subtitle = element_text(size = 14),
+    legend.title = element_text(size = 13),
+    legend.text = element_text(size = 13),
+    strip.placement = "outside"
+  )
+
+```
+
+## Correlation between NAO and extreme precipitation
+
+Figure X shows the correlation between the NAO index and the number of extreme precipitation days. Blue colours mean a negative correlation, so higher NAO values are linked to fewer extreme precipitation days. Brown colours mean a positive correlation, so higher NAO values are linked to more extreme precipitation days. The black dots show where the correlation is statistically significant.
+
+The clearest pattern is in winter (DJF). Large parts of western and the Iberian Peninsula show a strong negative correlation. This means that when the NAO becomes more positive, extreme precipitation days decrease. This fits well with the earlier results, where positive NAO reduced winter extremes and negative NAO increased them. In spring (MAM), the pattern is more mixed. Some central and eastern areas show a positive correlation, while western areas are more negative. In summer (JJA) and autumn (SON), the correlations are weaker and more scattered, with no clear pattern across the whole region. The NAO has the strongest link with extreme precipitation in winter. In the other seasons, the relationship is weaker and depends more on the location.
+
+```{r}
+
+cor_grid <- ext_phase %>%                      
+  group_by(x, y, season) %>%
+  summarise(
+    r = cor(n_extreme_days, nao, method = "pearson"),
+    pval = cor.test(n_extreme_days, nao)$p.value,
+    .groups = "drop"
+  ) %>%
+  mutate(season = factor(season, c("DJF","MAM","JJA","SON")))
+
+ggplot(cor_grid) +
+  geom_raster(aes(x, y, fill = r)) +
+  geom_sf(data = coast, colour = "black", fill = NA, linewidth = .2) +
+  geom_point(
+    data = subset(cor_grid, pval < 0.05),
+    aes(x, y),
+    shape = 21, size = .25, colour = "black"
+  ) +
+  coord_sf(
+    xlim = c(-12, 6),
+    ylim = c(35, 45),
+    expand = FALSE
+  ) +
+  facet_wrap(~ season, ncol = 1, strip.position = "left") +
+  scale_fill_paletteer_c(
+    "grDevices::Vik",
+    limits = c(-1, 1),
+    name = "r(NAO, extremes)"
+  ) +
+  labs(
+    title = "Correlation between NAO index and extreme precipitation",
+    subtitle = "Pearson correlation (1995–2025)"
+  ) +
+  theme_bw(base_size = 9) +
+  theme(
+    panel.grid = element_blank(),
+    strip.text.y = element_text(angle = 0, face = "bold"),
+    strip.placement = "outside"
+  )
+
+```
+
+## NAO influence on drought
+
+### Positive NAO phase
+
+Figure X shows the difference in drought months between positive NAO phases and neutral phases. Red colours mean more drought months during positive NAO, while blue colours mean fewer drought months.The black crosses show where the difference is statistically significant according to the Welch t-test.
+
+In winter (DJF), almost the whole map is red. This means that positive NAO is linked to more drought months across most of Iberia. The most increase appears in the north of Spain and toward the eastern Mediterranean side. In spring (MAM), the pattern is more regional. The western side of Iberia, Portugal and the south-west, has more drought months. In contrast, parts of the east and south-east show fewer drought months. In summer (JJA), the signal is weaker and more mixed. There are some increases in drought months in the north and west and parts of the east and south-east show lower values. In autumn (SON), the pattern changes more clearly. The south-west and central-southern parts show fewer drought months and some areas in the north show a small increase. The positive NAO is most clearly linked to more drought in winter. In the other seasons, the effect depends much more on location.
+
+```{r}
+
+to_map_pos <- plot_df2 %>%
+  select(x, y, season, diff = diff_pos, pval = p_pos)
+
+ggplot(to_map_pos) +
+  geom_raster(aes(x, y, fill = diff)) +
+  geom_sf(data = coast, color = "black", fill = NA, linewidth = 0.2) +
+  geom_point(
+    data = filter(to_map_pos, pval < 0.05),
+    aes(x, y),
+    shape = 3, size = 0.3, color = "black"
+  ) +
+  coord_sf(
+    xlim = c(-12, 6),
+    ylim = c(35, 45),
+    expand = FALSE
+  ) +
+  
+  # 2 columns, 2 rows
+  facet_wrap(~ season, ncol = 2) +
+  
+  scale_fill_distiller(
+    palette = "RdBu",
+    direction = -1,
+    limits = c(-0.5, 0.5),
+    breaks = seq(-0.5, 0.5, 0.2),
+    name = "Δ drought months\n(POS – NEU)",
+    guide = guide_colorbar(
+      barheight = unit(8, "cm")
+    )
+  ) +
+  labs(
+    title = "NAO influence on drought",
+    subtitle = "Positive NAO phase minus neutral",
+    x = NULL,
+    y = NULL
+  ) +
+  theme_bw(base_size = 14) +
+  theme(
+    panel.grid = element_blank(),
+    strip.text = element_text(size = 15, face = "bold"),
+    axis.text = element_text(size = 13),
+    plot.title = element_text(size = 17, face = "bold"),
+    plot.subtitle = element_text(size = 14),
+    legend.title = element_text(size = 13),
+    legend.text = element_text(size = 13),
+    strip.placement = "outside"
+  )
+
+```
+
+### Negative NAO phase
+
+Figure X shows how drought months change during negative NAO phases compared with neutral phases.
+
+In winter (DJF), the pattern is mostly light blue or close to zero. This means negative NAO slightly reduces drought in much of Iberia, but the effect is not very strong. In spring (MAM), many central and western parts are red, showing more drought months during negative NAO. The east and south-east are more neutral or slightly blue. In summer (JJA), the pattern is weak and mixed. Most areas are close to zero, with small increases in parts of central Spain and small decreases near the south-east. In autumn (SON), central and western Iberia show fewer drought months, while the eastern side has slightly more. Overall, negative NAO has no very strong drought signal, but the clearest decrease appears in autumn over central and western Iberia.
+
+```{r}
+to_map_neg <- plot_df2 %>%
+  select(x, y, season, diff = diff_neg, pval = p_neg)
+
+ggplot(to_map_neg) +
+  geom_raster(aes(x, y, fill = diff)) +
+  geom_sf(data = coast, color = "black", fill = NA, linewidth = 0.2) +
+  geom_point(
+    data = filter(to_map_neg, pval < 0.05),
+    aes(x, y),
+    shape = 3, size = 0.3, color = "black"
+  ) +
+  coord_sf(
+    xlim = c(-12, 6),
+    ylim = c(35, 45),
+    expand = FALSE
+  ) +
+  
+  # 2 columns, 2 rows
+  facet_wrap(~ season, ncol = 2) +
+  
+  scale_fill_distiller(
+    palette = "RdBu",
+    direction = -1,
+    limits = c(-0.7, 0.7),
+    breaks = seq(-0.7, 0.7, 0.2),
+    name = "Δ drought months\n(NEG – NEU)",
+    guide = guide_colorbar(
+      barheight = unit(8, "cm")
+    )
+  ) +
+  labs(
+    title = "NAO influence on drought",
+    subtitle = "Negative NAO phase minus neutral",
+    x = NULL,
+    y = NULL
+  ) +
+  theme_bw(base_size = 14) +
+  theme(
+    panel.grid = element_blank(),
+    strip.text = element_text(size = 15, face = "bold"),
+    axis.text = element_text(size = 13),
+    plot.title = element_text(size = 17, face = "bold"),
+    plot.subtitle = element_text(size = 14),
+    legend.title = element_text(size = 13),
+    legend.text = element_text(size = 13),
+    strip.placement = "outside"
+  )
+```
+
+## Correlation between NAO and drought
+
+Figure X shows the Pearson correlation between the seasonal NAO index and the number of SPI-3 drought months. Positive values mean that higher NAO values are linked to more drought months, while negative values mean that higher NAO values are linked to fewer drought months. The black dots show where the correlation is statistically significant.
+
+This figure helps to check whether the drought patterns shown in the NAO phase comparison also appear as a linear relationship with the NAO index. If winter shows mostly positive correlations, this supports the result that positive NAO is linked to more drought conditions. In other seasons, weaker or mixed correlations would suggest that the NAO influence on drought is less consistent and depends more on location.
+
+```{r}
+ggplot(drought_cor_grid) +
+  geom_raster(aes(x, y, fill = r)) +
+  geom_sf(data = coast, colour = "black", fill = NA, linewidth = 0.2) +
+  geom_point(
+    data = subset(drought_cor_grid, pval < 0.05),
+    aes(x, y),
+    shape = 21,
+    size = 0.25,
+    colour = "black"
+  ) +
+  coord_sf(
+    xlim = c(-12, 6),
+    ylim = c(35, 45),
+    expand = FALSE
+  ) +
+  facet_wrap(~ season, ncol = 1, strip.position = "left") +
+  scale_fill_paletteer_c(
+    "grDevices::Vik",
+    limits = c(-1, 1),
+    name = "r(NAO, drought)"
+  ) +
+  labs(
+    title = "Correlation between NAO index and drought frequency",
+    subtitle = "Pearson correlation between NAO and SPI-3 drought months"
+  ) +
+  theme_bw(base_size = 9) +
+  theme(
+    panel.grid = element_blank(),
+    strip.text.y = element_text(angle = 0, face = "bold"),
+    strip.placement = "outside"
+  )
+```
+
+# Discussion
+
+## NAO influence in winter
+
+The results show that the NAO has the clearest influence during winter. The NAO is strongest in winter and has a large influence on the position of the North Atlantic storm track. During a positive NAO phase, the pressure gradient over the North Atlantic is stronger, causing the storm track to shift northwards. This brings wetter conditions to Northern Europe, but drier conditions to Southern Europe and the Mediterranean region. During a negative NAO phase, the storm track can shift farther south, which can bring more rainfall to Southern Europe (NOAA NCEI, n.d.; McKenna et al., 2022). That is why the clearest results in this study are evident in winter. Winter precipitation in the Iberian Peninsula is strongly influenced by the position of storm tracks over the Atlantic Ocean, with changes in the NAO having a direct impact on both periods of heavy rainfall and dry conditions.
+
+In winter, a positive NAO is linked to fewer extreme precipitation days over much of Iberia, especially in the west and south-west. The correlation map also shows a strong negative relationship in winter, meaning that when the NAO index becomes more positive, extreme precipitation days decrease. This is also shown in previous research that NAO has a clear influence on winter precipitation and extreme precipitation events over Spain and Southern Europe (Trigo et al., 2004; Queralt et al., 2009; McKenna et al., 2022). The negative NAO results also confirm this finding. During negative NAO phases, the western part of Iberia, especially Portugal and north-western areas, shows more extreme precipitation days in winter. This is the expected effect of negative NAO, where wetter conditions become more likely in Southern Europe because Atlantic disturbances can reach farther south (Luo et al., 2011; Riaz et al., 2017). Together, the positive and negative NAO results show a consistent winter pattern: positive NAO reduces extreme precipitation, while negative NAO increases it in parts of western Iberia.
+
+## Seasonal differences
+
+In spring, summer, and autumn, the NAO signal is less clear. The maps show more mixed patterns, with some areas becoming wetter and others drier. Outside winter, the NAO is usually less dominant, and precipitation can be influenced by other factors, such as local convection, Mediterranean circulation, regional pressure systems, and moisture availability (Trigo et al., 2004; Tabari & Willems, 2018). This explains why the correlations in MAM, JJA, and SON are more spatially variable. This is important because it shows that the NAO is not the only control on extreme precipitation in the Iberian Peninsula. In summer especially, rainfall events are often more local and convective, so a large-scale index such as the NAO may explain less of the observed pattern (Tabari & Willems, 2018; Claro et al., 2023).
+
+## Link between extreme precipitation and drought
+
+The drought results also agree with the general NAO pattern. Positive NAO is linked to more drought months in winter, especially across much of Iberia. This makes sense because positive NAO reduces winter rainfall in Southern Europe, and winter precipitation is very important for water availability in the region. Previous studies also found that positive NAO phases are connected with drought conditions in Iberia and Southern Europe. For example, the severe 2004/2005 drought in Iberia was partly linked to positive NAO conditions during the winter months (García-Herrera et al., 2007; Hertig & Pongrácz, 2013).
+
+The results for drought show the other side of the same NAO influence. Whilst positive NAO conditions reduce winter precipitation, they can decrease the number of days with extreme precipitation and, at the same time, increase drought. This makes it important to analyse wet and dry extremes together, as both responses are linked to the same atmospheric circulation pattern.
+
+The negative NAO drought results are weaker. In winter, drought is reduced in many areas, but the signal is not very strong. In autumn, drought decreases more clearly in central and western Iberia. This shows that negative NAO can reduce drought risk in some seasons and regions, but the effect is not as strong or as consistent as the winter effect of positive NAO. This may be because drought is more persistent than extreme rainfall. Extreme rainfall is assessed on a single-day basis, whereas the SPI-3 measures the precipitation deficit over a three-month period. As a result, drought conditions may depend not only on the NAO phase during a single season, but also on precipitation conditions in the preceding months.
+
+The results show that the NAO is an important driver of hydroclimatic extremes in the Iberian Peninsula, but mainly in winter. Positive NAO generally reduces extreme precipitation and increases drought risk, while negative NAO tends to increase winter extreme precipitation and slightly reduce drought. In the other seasons, the relationship is weaker and depends more on location. This means that the NAO is important, but it is not the only factor controlling extreme precipitation and drought in the Iberian Peninsula.
+
+## Limitations
+
+There are also some limitations in this study. First, the analysis is based only on ERA5 precipitation data, so the results were not compared with another dataset or with station observations. This means that some local rainfall extremes may not be fully captured because of the resolution of the data. Second, the study shows statistical relationships between the NAO and hydroclimate extremes. It does not directly analyse the physical mechanisms behind the extreme events, such as changes in storm tracks, pressure patterns, vertical motion, or moisture transport. Third, the study period from 1995 to 2025 is relatively short for studying climate extremes. Because extreme events are rare, a longer period could make the statistical results more robust. Finally, drought was analysed using SPI-3, which is based only on precipitation. It does not include temperature, evaporation, soil moisture, or human water use, and those can also influence drought conditions (Svoboda et al., 2012; NCAR Climate Data Guide, n.d.).
+
+The results also depend on the methodological thresholds used in the analysis. Extreme precipitation was defined using the 95th percentile of wet days, and drought was defined using SPI-3 values below −1. Other choices, such as using another percentile, a different wet-day threshold, or another SPI timescale, could lead to slightly different spatial patterns. Therefore, the results should be interpreted as conditional on these definitions. A future sensitivity test could repeat the analysis with different thresholds to assess how robust the patterns are.
+
+Because of these limitations, the results should be interpreted as statistical relationships rather than direct proof of causality. Still, the agreement between the extreme precipitation results, the drought results, and previous studies gives confidence that the winter patterns found in this study are meaningful.
+
+# Conclusion
+
+# References
+
+Alizadeh, O., & Mousavizadeh, M. (2025). Impact of ENSO on extreme precipitation in Southwest Asia. *Global and Planetary Change, 244*, 104645. https://doi.org/10.1016/j.gloplacha.2024.104645
+
+Climdex. (n.d.). *Learn about climate indices*. Retrieved June 1, 2026, from https://www.climdex.org/learn/indices/
+
+Claro, A. M., Fonseca, A., Fraga, H., & Santos, J. A. (2023). Susceptibility of Iberia to extreme precipitation and aridity: A new high-resolution analysis over an extended historical period. *Water, 15*(21), 3840. https://doi.org/10.3390/w15213840
+
+Copernicus Climate Change Service, Climate Data Store. (2024). *ERA5 post-processed daily statistics on single levels from 1940 to present*. Copernicus Climate Change Service (C3S) Climate Data Store (CDS). https://doi.org/10.24381/cds.4991cf48
+
+European Environment Agency. (2024). *European Climate Risk Assessment*. EEA Report No. 01/2024. https://www.eea.europa.eu/en/analysis/publications/european-climate-risk-assessment
+
+Fuentes-Franco, R., Giorgi, F., Coppola, E., & Zimmermann, K. (2023). Winter heavy precipitation events over Northern Europe modulated by a weaker NAO variability by the end of the 21st century. *npj Climate and Atmospheric Science, 6*, 72. https://doi.org/10.1038/s41612-023-00396-1
+
+García-Herrera, R., Paredes, D., Trigo, R. M., Trigo, I. F., Hernández, E., Barriopedro, D., & Mendes, M. A. (2007). The outstanding 2004/05 drought in the Iberian Peninsula: Associated atmospheric circulation. *Journal of Hydrometeorology, 8*(3), 483--498. https://doi.org/10.1175/JHM578.1
+
+Hertig, E., & Pongrácz, R. (2013). Spring drought prediction based on winter NAO and global sea surface temperatures in the Iberian Peninsula. *Climate Dynamics, 40*, 2867--2881. https://doi.org/10.1007/s00382-012-1588-1
+
+Hurrell, J. W. (n.d.). *North Atlantic Oscillation (NAO) Index: PC-Based*. Climate Data Guide. National Center for Atmospheric Research. Retrieved June 1, 2026, from https://climatedataguide.ucar.edu/climate-data/hurrell-north-atlantic-oscillation-nao-index-pc-based
+
+Liu, Q., Lohmann, G., & Bothe, O. (2025). More extreme summertime North Atlantic Oscillation under climate change. *Communications Earth & Environment, 6*, 397. https://doi.org/10.1038/s43247-025-02422-x
+
+Luo, D., Lupo, A. R., & Wan, H. (2011). The variability of the Atlantic storm track and the North Atlantic Oscillation: A link between intraseasonal and interannual variability. *Journal of the Atmospheric Sciences, 68*(3), 577--601. https://doi.org/10.1175/2010JAS3579.1
+
+McKenna, C. M., Bracegirdle, T. J., Shonk, J. K. P., & Joshi, M. M. (2022). The role of the North Atlantic Oscillation for projections of winter mean precipitation in Europe. *Geophysical Research Letters, 49*, e2022GL099083. https://doi.org/10.1029/2022GL099083
+
+Met Office. (n.d.). *The North Atlantic Oscillation*. Retrieved June 1, 2026, from https://www.metoffice.gov.uk/research/climate/seasonal-to-decadal/gpc-outlooks/ens-mean/nao-description
+
+NCAR Climate Data Guide. (n.d.). *Standardized Precipitation Index (SPI)*. National Center for Atmospheric Research. Retrieved June 1, 2026, from https://climatedataguide.ucar.edu/climate-data/standardized-precipitation-index-spi
+
+NOAA National Centers for Environmental Information. (n.d.). *North Atlantic Oscillation (NAO)*. National Oceanic and Atmospheric Administration. Retrieved June 1, 2026, from https://www.ncei.noaa.gov/access/monitoring/nao/
+
+NOAA Physical Sciences Laboratory. (n.d.). *Climate timeseries: North Atlantic Oscillation (NAO)*. National Oceanic and Atmospheric Administration. Retrieved June 1, 2026, from https://psl.noaa.gov/data/20thC_Rean/timeseries/monthly/NAO/
+
+Queralt, S., Hernández, E., Barriopedro, D., Gallego, D., Ribera, P., Casanova, C., & Paredes, D. (2009). North Atlantic Oscillation influence and weather types associated with winter total and extreme precipitation events in Spain. *Atmospheric Research, 94*(4), 675--683. https://doi.org/10.1016/j.atmosres.2009.09.005
+
+Riaz, S. M. F., Iqbal, M. J., & Athar, H. (2017). Impact of the North Atlantic Oscillation on winter climate of Germany. *Tellus A: Dynamic Meteorology and Oceanography, 69*(1), 1406263. https://doi.org/10.1080/16000870.2017.1406263
+
+Svoboda, M., Hayes, M., & Wood, D. (2012). *Standardized Precipitation Index User Guide*. World Meteorological Organization, WMO-No. 1090.
+
+Tabari, H., & Willems, P. (2018). Lagged influence of Atlantic and Pacific climate patterns on European extreme precipitation. *Scientific Reports, 8*, 5748. https://doi.org/10.1038/s41598-018-24069-9
+
+Trigo, R. M., Pozo-Vázquez, D., Osborn, T. J., Castro-Díez, Y., Gámiz-Fortis, S., & Esteban-Parra, M. J. (2004). North Atlantic Oscillation influence on precipitation, river flow and water resources in the Iberian Peninsula. *International Journal of Climatology, 24*(8), 925--944. https://doi.org/10.1002/joc.1048
+
+Yin, X., Zhang, Z., Lin, Z., & Yin, J. (2025). Assessment of rainfall frequencies from global precipitation datasets. *Atmosphere, 16*(1), 66. https://doi.org/10.3390/atmos16010066
