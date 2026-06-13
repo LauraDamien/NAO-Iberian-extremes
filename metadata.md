@@ -2,11 +2,11 @@
 
 ## Project
 
-**Title:** Influence of the North Atlantic Oscillation on extreme precipitation and drought in the Iberian Peninsula
-**Author:** Laura Damien
-**Course:** LGEO2185 – Advanced Geo-processing
-**Institution:** UCLouvain
-**Study period:** 1995–2025
+- Title: Influence of the North Atlantic Oscillation on extreme precipitation and drought in the Iberian Peninsula
+- Author: Laura Damien
+- nCourse: LGEO2185 – Advanced Geo-processing
+- Institution: UCLouvain
+- Study period: 1995–2025
 
 ## Data access
 
@@ -37,27 +37,27 @@ data/
 
 ## ERA5 precipitation data
 
-**Source:** Copernicus Climate Change Service, Climate Data Store
-**Dataset:** ERA5 daily precipitation data derived from ERA5 reanalysis
-**Producing centre:** ECMWF
-**Variable:** Total precipitation
-**Original unit:** metres
-**Processed unit:** millimetres
-**Format:** NetCDF `.nc`
-**Temporal coverage used:** 1994–2025
-**Spatial coverage used:** Iberian Peninsula
-**Bounding box:** 45°N to 35°N, 12°W to 6°E
+- Source: Copernicus Climate Change Service, Climate Data Store
+- Dataset: ERA5 daily precipitation data derived from ERA5 reanalysis
+- Producing centre: ECMWF
+- Variable: Total precipitation
+- Original unit: metres
+- Processed unit: millimetres
+- Format: NetCDF `.nc`
+- Temporal coverage used: 1994–2025
+- Spatial coverage used: Iberian Peninsula
+- Bounding box: 45°N to 35°N, 12°W to 6°E
 
 The year 1994 is included because December 1994 is needed to calculate the first complete winter season, DJF 1995.
 
 ## NAO index data
 
-**Source:** NCAR Climate Data Guide
-**Dataset:** PC-based Hurrell North Atlantic Oscillation index
-**File:** `NAO_index.csv`
-**Format:** CSV
-**Temporal resolution:** Seasonal
-**Columns:** `Year`, `DJF`, `MAM`, `JJA`, `SON`
+- Source: NCAR Climate Data Guide
+- Dataset: PC-based Hurrell North Atlantic Oscillation index
+- File: `NAO_index.csv`
+- Format: CSV
+- Temporal resolution: Seasonal
+- Columns: `Year`, `DJF`, `MAM`, `JJA`, `SON`
 
 The NAO index is used to classify seasons into positive, neutral and negative NAO phases.
 
