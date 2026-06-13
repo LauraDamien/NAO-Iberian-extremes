@@ -10,9 +10,12 @@
 
 ## Data access
 
-The input data are stored in an external cloud folder because the ERA5 NetCDF files are too large to include directly in the GitHub repository.
+The input data are stored in an external UCLouvain SharePoint folder because the ERA5 NetCDF files are too large to include directly in the GitHub repository.
 
-Before running the analysis, users must download the data from the cloud folder and place all files in the local `data/` folder.
+External data folder:  
+[UCLouvain SharePoint data folder](https://uclouvain-my.sharepoint.com/:f:/r/personal/laura_damien_student_uclouvain_be/Documents/LGEO2185_NAO_Iberian_Hydroclimate_Extremes_LauraDamien?csf=1&web=1&e=EVHYwZ)
+
+Before running the analysis, users must download the data from this folder and place all files in the local `data/` folder.
 
 ## Data included
 
@@ -24,7 +27,7 @@ The dataset contains two main inputs:
 2. **Seasonal NAO index**:
    A CSV file with seasonal North Atlantic Oscillation index values.
 
-Expected local file structure:
+Local file structure:
 
 ```text
 data/
@@ -73,8 +76,12 @@ The NAO index file is used to compare extreme precipitation and drought patterns
 
 ## Data availability
 
-The GitHub repository does not include the input data files.
-All input data must be downloaded from the external cloud folder and placed in the `data/` folder before rendering the Quarto report.
+The GitHub repository does not include the input data files.  
+All input data are available in the external UCLouvain SharePoint folder:
+
+[UCLouvain SharePoint data folder](https://uclouvain-my.sharepoint.com/:f:/r/personal/laura_damien_student_uclouvain_be/Documents/LGEO2185_NAO_Iberian_Hydroclimate_Extremes_LauraDamien?csf=1&web=1&e=EVHYwZ)
+
+Users must download the ERA5 NetCDF files and the `NAO_index.csv` file and place them in the `data/` folder before rendering the Quarto report.
 
 ## Data sensitivity
 
